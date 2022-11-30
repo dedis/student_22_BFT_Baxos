@@ -3,7 +3,7 @@ syntax = "proto3";
 import "proto/google/protobuf/empty.proto";
 import "proto/google/protobuf/timestamp.proto";
 
-option go_package="./";
+option go_package="./BFTBaxos";
 
 //Phase 1: Prepare-Promise phase
 message PrepareMsg {
@@ -11,27 +11,27 @@ message PrepareMsg {
   uint64 Ballot = 1;
 
   // Liveness
-  repeated google.protobuf.Timestamp TimeStampSet = 2;
+  float K = 2;
+  repeated BFTTimeStamp TimeStampSet = 3;
   // if ballot is 0 no need for BallotQC
-  optional BallotQuorumCert BallotQC = 3;
+  optional BallotQuorumCert BallotQC = 4;
 }
 
 message PromiseMsg {
-  // Safety
-  //positive or negative promise
-  bool Promised = 1;
+  bool Contention = 1;
+  uint64 Ballot = 2;
   // optional Ballot previously accepted
-  optional uint64 AcceptedBallot = 2;
+  optional uint64 AcceptedBallot = 3;
   // optional Value previously accepted
-  optional string AcceptedValue = 3;
+  optional string AcceptedValue = 4;
   // optional QC for AcceptedValue
-  optional AcceptQuorumCert PreAcceptQC= 4;
+  optional AcceptQuorumCert PreAcceptQC= 5;
 
   // Liveness
-  google.protobuf.Timestamp TimeStamp = 5;
+  BFTTimeStamp TimeStamp = 6;
   // Partial signature over the NextBallot
-  uint64 NextBallot = 6;
-  PartialSignature BallotSig = 7;
+  uint64 NextBallot = 7;
+  PartialSignature BallotSig = 8;
 }
 
 //Phase 2: Pre_Propose-Pre_Accept phase
@@ -48,18 +48,19 @@ message PreProposeMsg {
 
 // Used in both phase2 and phase3
 message AcceptMsg {
-  uint64 Phase = 1;
-  uint64 Ballot = 2;
+  bool Contention = 1;
+  uint64 Phase = 2;
+  uint64 Ballot = 3;
   // Value are pre_accepted/accepted
-  string AcceptValue = 3;
+  string AcceptValue = 4;
   // Partial signature over the tuple < Phase, Ballot, AcceptValue >
-  PartialSignature SafetySig = 4;
+  PartialSignature SafetySig = 5;
 
   // Liveness
-  google.protobuf.Timestamp TimeStamp = 5;
+  BFTTimeStamp TimeStamp = 6;
   // Partial signature over the NextBallot
-  uint64 NextBallot = 6;
-  PartialSignature BallotSig = 7;
+  uint64 NextBallot = 7;
+  PartialSignature BallotSig = 8;
 }
 
 message AcceptQuorumCert {
@@ -106,6 +107,14 @@ message QuorumSignature {
 message BallotQuorumCert {
   uint64 NextBallot = 1;
   QuorumSignature BallotSig = 2;
+}
+
+message BFTTimeStamp {
+  uint64 Singer = 1;
+  uint64 Ballot = 2;
+  google.protobuf.Timestamp Timestamp = 3;
+  // We might need to attach a hash for <Singer, Ballot, Timestamp>
+  //bytes Hash = 4;
 }
 
 service BFTBaxos {
