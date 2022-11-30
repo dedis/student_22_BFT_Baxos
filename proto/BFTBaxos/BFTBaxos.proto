@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+import "proto/google/protobuf/empty.proto";
+import "proto/google/protobuf/timestamp.proto";
+
+option go_package="./";
+
+//Phase 1: Prepare-Promise phase
+message PrepareMsg {
+  // Safety
+  uint64 Ballot = 1;
+
+  // Liveness
+  repeated google.protobuf.Timestamp TimeStampSet = 2;
+  // if ballot is 0 no need for BallotQC
+  optional BallotQuorumCert BallotQC = 3;
+}
+
+message PromiseMsg {
+  // Safety
+  //positive or negative promise
+  bool Promised = 1;
+  // optional Ballot previously accepted
+  optional uint64 AcceptedBallot = 2;
+  // optional Value previously accepted
+  optional string AcceptedValue = 3;
+  // optional QC for AcceptedValue
+  optional AcceptQuorumCert PreAcceptQC= 4;
+
+  // Liveness
+  google.protobuf.Timestamp TimeStamp = 5;
+  // Partial signature over the NextBallot
+  uint64 NextBallot = 6;
+  PartialSignature BallotSig = 7;
+}
+
+//Phase 2: Pre_Propose-Pre_Accept phase
+message PreProposeMsg {
+  uint64 Ballot = 1;
+  // Value chosen according to the PromiseSet
+  string Pre_proseValue = 2;
+  // A list of Promise, used to convince acceptors the Pre_proposeValue has the highest ballot number
+  repeated PromiseMsg PromiseSet = 3;
+
+  // if ballot is 0 no need for BallotQC
+  optional BallotQuorumCert BallotQC = 4;
+}
+
+// Used in both phase2 and phase3
+message AcceptMsg {
+  uint64 Phase = 1;
+  uint64 Ballot = 2;
+  // Value are pre_accepted/accepted
+  string AcceptValue = 3;
+  // Partial signature over the tuple < Phase, Ballot, AcceptValue >
+  PartialSignature SafetySig = 4;
+
+  // Liveness
+  google.protobuf.Timestamp TimeStamp = 5;
+  // Partial signature over the NextBallot
+  uint64 NextBallot = 6;
+  PartialSignature BallotSig = 7;
+}
+
+message AcceptQuorumCert {
+  uint64 Phase = 1;
+  uint64 Ballot = 2;
+  // Value are pre_accepted/accepted
+  string AcceptValue = 3;
+  // QuorumSignature is combined from a quorum of partial signature
+  QuorumSignature Sig = 4;
+}
+
+//Phase 3: Propose-Accept phase
+message ProposeMsg {
+  uint64 Ballot = 1;
+  string ProseValue = 2;
+
+  AcceptQuorumCert PreAcceptQC = 3;
+
+  // if ballot is 0 no need for BallotQC
+  optional BallotQuorumCert BallotQC = 4;
+}
+//Commit
+message CommitMsg {
+  uint64 Ballot = 1;
+  string CommitValue = 2;
+
+  AcceptQuorumCert AcceptQC = 3;
+
+  // if ballot is 0 no need for BallotQC
+  optional BallotQuorumCert BallotQC = 4;
+}
+
+// crypto part
+message PartialSignature {
+  //????
+}
+
+message QuorumSignature {
+  //????
+}
+
+// backoff part
+
+message BallotQuorumCert {
+  uint64 NextBallot = 1;
+  QuorumSignature BallotSig = 2;
+}
+
+service BFTBaxos {
+  rpc Promise (PrepareMsg) returns (PromiseMsg);
+  rpc PrePropose (PreProposeMsg) returns (AcceptMsg);
+  rpc Propose (ProposeMsg) returns (AcceptMsg);
+  rpc Commit (CommitMsg) returns (google.protobuf.Empty);
+}
+

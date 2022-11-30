@@ -1,0 +1,12 @@
+---
+name: node3
+increment: 3
+timeout: 500ms
+listen: 127.0.0.1:8003
+peers:
+  - name: node1
+    address: 127.0.0.1:8001
+  - name: node2
+    address: 127.0.0.1:8002
+  - name: node4
+    address: 127.0.0.1:8004
