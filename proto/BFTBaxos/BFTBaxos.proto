@@ -1,20 +1,20 @@
 syntax = "proto3";
 
 import "proto/google/protobuf/empty.proto";
-import "proto/google/protobuf/timestamp.proto";
 
-option go_package="./BFTBaxos";
+option go_package="./";
 
 //Phase 1: Prepare-Promise phase
 message PrepareMsg {
+  string From = 1;
   // Safety
-  uint64 Ballot = 1;
+  uint64 Ballot = 2;
 
   // Liveness
-  float K = 2;
-  repeated BFTTimeStamp TimeStampSet = 3;
-  // if ballot is 0 no need for BallotQC
-  optional BallotQuorumCert BallotQC = 4;
+  float K = 3;
+  repeated BFTTimeStamp  TimeStamp = 4;
+  // if ballot is ID of node no need for BallotQC (the first try)
+  optional BallotQuorumCert BallotQC = 5;
 }
 
 message PromiseMsg {
@@ -28,7 +28,7 @@ message PromiseMsg {
   optional AcceptQuorumCert PreAcceptQC= 5;
 
   // Liveness
-  BFTTimeStamp TimeStamp = 6;
+  BFTTimeStamp  TimeStamp = 6;
   // Partial signature over the NextBallot
   uint64 NextBallot = 7;
   PartialSignature BallotSig = 8;
@@ -36,14 +36,13 @@ message PromiseMsg {
 
 //Phase 2: Pre_Propose-Pre_Accept phase
 message PreProposeMsg {
-  uint64 Ballot = 1;
+  string From = 1;
+  uint64 Ballot = 2;
   // Value chosen according to the PromiseSet
-  string Pre_proseValue = 2;
+  string Pre_proposeValue = 3;
   // A list of Promise, used to convince acceptors the Pre_proposeValue has the highest ballot number
-  repeated PromiseMsg PromiseSet = 3;
+  repeated PromiseMsg PromiseSet = 4;
 
-  // if ballot is 0 no need for BallotQC
-  optional BallotQuorumCert BallotQC = 4;
 }
 
 // Used in both phase2 and phase3
@@ -74,23 +73,21 @@ message AcceptQuorumCert {
 
 //Phase 3: Propose-Accept phase
 message ProposeMsg {
-  uint64 Ballot = 1;
-  string ProseValue = 2;
+  string From = 1;
+  uint64 Ballot = 2;
+  string ProposeValue = 3;
 
-  AcceptQuorumCert PreAcceptQC = 3;
+  AcceptQuorumCert PreAcceptQC = 4;
 
-  // if ballot is 0 no need for BallotQC
-  optional BallotQuorumCert BallotQC = 4;
 }
 //Commit
 message CommitMsg {
-  uint64 Ballot = 1;
-  string CommitValue = 2;
+  string From = 1;
+  uint64 Ballot = 2;
+  string CommitValue = 3;
 
-  AcceptQuorumCert AcceptQC = 3;
+  AcceptQuorumCert AcceptQC = 4;
 
-  // if ballot is 0 no need for BallotQC
-  optional BallotQuorumCert BallotQC = 4;
 }
 
 // crypto part
@@ -110,17 +107,17 @@ message BallotQuorumCert {
 }
 
 message BFTTimeStamp {
-  uint64 Singer = 1;
+  string Singer = 1;
   uint64 Ballot = 2;
-  google.protobuf.Timestamp Timestamp = 3;
+  int64 Timestamp = 3;
   // We might need to attach a hash for <Singer, Ballot, Timestamp>
   //bytes Hash = 4;
 }
 
 service BFTBaxos {
   rpc Promise (PrepareMsg) returns (PromiseMsg);
-  rpc PrePropose (PreProposeMsg) returns (AcceptMsg);
-  rpc Propose (ProposeMsg) returns (AcceptMsg);
+  rpc PreAccept (PreProposeMsg) returns (AcceptMsg);
+  rpc Accept (ProposeMsg) returns (AcceptMsg);
   rpc Commit (CommitMsg) returns (google.protobuf.Empty);
 }
 

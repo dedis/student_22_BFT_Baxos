@@ -9,6 +9,7 @@ import (
 	"os"
 	"student_22_BFT_Baxos/colory"
 	"student_22_BFT_Baxos/config"
+	"student_22_BFT_Baxos/proto/application"
 	"student_22_BFT_Baxos/proto/consensus"
 )
 
@@ -51,6 +52,8 @@ func main() {
 	// register service into server
 	consensus.RegisterConsensusServer(rpcServer, in)
 	fmt.Println("register consensus service")
+	application.RegisterApplicationServer(rpcServer, in)
+	fmt.Println("register application service")
 
 	// start listener
 	listener, err := net.Listen("tcp", cfg.Listen)

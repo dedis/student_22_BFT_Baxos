@@ -24,8 +24,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BFTBaxosClient interface {
 	Promise(ctx context.Context, in *PrepareMsg, opts ...grpc.CallOption) (*PromiseMsg, error)
-	PrePropose(ctx context.Context, in *PreProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error)
-	Propose(ctx context.Context, in *ProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error)
+	PreAccept(ctx context.Context, in *PreProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error)
+	Accept(ctx context.Context, in *ProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error)
 	Commit(ctx context.Context, in *CommitMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -46,18 +46,18 @@ func (c *bFTBaxosClient) Promise(ctx context.Context, in *PrepareMsg, opts ...gr
 	return out, nil
 }
 
-func (c *bFTBaxosClient) PrePropose(ctx context.Context, in *PreProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error) {
+func (c *bFTBaxosClient) PreAccept(ctx context.Context, in *PreProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error) {
 	out := new(AcceptMsg)
-	err := c.cc.Invoke(ctx, "/BFTBaxos/PrePropose", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/BFTBaxos/PreAccept", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *bFTBaxosClient) Propose(ctx context.Context, in *ProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error) {
+func (c *bFTBaxosClient) Accept(ctx context.Context, in *ProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error) {
 	out := new(AcceptMsg)
-	err := c.cc.Invoke(ctx, "/BFTBaxos/Propose", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/BFTBaxos/Accept", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (c *bFTBaxosClient) Commit(ctx context.Context, in *CommitMsg, opts ...grpc
 // for forward compatibility
 type BFTBaxosServer interface {
 	Promise(context.Context, *PrepareMsg) (*PromiseMsg, error)
-	PrePropose(context.Context, *PreProposeMsg) (*AcceptMsg, error)
-	Propose(context.Context, *ProposeMsg) (*AcceptMsg, error)
+	PreAccept(context.Context, *PreProposeMsg) (*AcceptMsg, error)
+	Accept(context.Context, *ProposeMsg) (*AcceptMsg, error)
 	Commit(context.Context, *CommitMsg) (*emptypb.Empty, error)
 	mustEmbedUnimplementedBFTBaxosServer()
 }
@@ -91,11 +91,11 @@ type UnimplementedBFTBaxosServer struct {
 func (UnimplementedBFTBaxosServer) Promise(context.Context, *PrepareMsg) (*PromiseMsg, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Promise not implemented")
 }
-func (UnimplementedBFTBaxosServer) PrePropose(context.Context, *PreProposeMsg) (*AcceptMsg, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PrePropose not implemented")
+func (UnimplementedBFTBaxosServer) PreAccept(context.Context, *PreProposeMsg) (*AcceptMsg, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PreAccept not implemented")
 }
-func (UnimplementedBFTBaxosServer) Propose(context.Context, *ProposeMsg) (*AcceptMsg, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Propose not implemented")
+func (UnimplementedBFTBaxosServer) Accept(context.Context, *ProposeMsg) (*AcceptMsg, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Accept not implemented")
 }
 func (UnimplementedBFTBaxosServer) Commit(context.Context, *CommitMsg) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Commit not implemented")
@@ -131,38 +131,38 @@ func _BFTBaxos_Promise_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BFTBaxos_PrePropose_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BFTBaxos_PreAccept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PreProposeMsg)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BFTBaxosServer).PrePropose(ctx, in)
+		return srv.(BFTBaxosServer).PreAccept(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/BFTBaxos/PrePropose",
+		FullMethod: "/BFTBaxos/PreAccept",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BFTBaxosServer).PrePropose(ctx, req.(*PreProposeMsg))
+		return srv.(BFTBaxosServer).PreAccept(ctx, req.(*PreProposeMsg))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BFTBaxos_Propose_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _BFTBaxos_Accept_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ProposeMsg)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(BFTBaxosServer).Propose(ctx, in)
+		return srv.(BFTBaxosServer).Accept(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/BFTBaxos/Propose",
+		FullMethod: "/BFTBaxos/Accept",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BFTBaxosServer).Propose(ctx, req.(*ProposeMsg))
+		return srv.(BFTBaxosServer).Accept(ctx, req.(*ProposeMsg))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -197,12 +197,12 @@ var BFTBaxos_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BFTBaxos_Promise_Handler,
 		},
 		{
-			MethodName: "PrePropose",
-			Handler:    _BFTBaxos_PrePropose_Handler,
+			MethodName: "PreAccept",
+			Handler:    _BFTBaxos_PreAccept_Handler,
 		},
 		{
-			MethodName: "Propose",
-			Handler:    _BFTBaxos_Propose_Handler,
+			MethodName: "Accept",
+			Handler:    _BFTBaxos_Accept_Handler,
 		},
 		{
 			MethodName: "Commit",

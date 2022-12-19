@@ -1,0 +1,13 @@
+syntax = "proto3";
+option go_package="./";
+
+message Request {
+  string color = 1;
+}
+message Response {
+  bool result = 1;
+}
+
+service Application {
+  rpc Paint(Request) returns (Response);
+}

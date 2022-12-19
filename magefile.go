@@ -11,7 +11,7 @@ var (
 	//Default = Build
 	//targets = []string{"skinnyd", "skinnyctl"}
 	//protos = []string{"consensus"}
-	protos = []string{"BFTBaxos"}
+	protos = []string{"BFTBaxos", "application"}
 )
 
 // Install build dependencies.
