@@ -14,8 +14,10 @@ var (
 	flagConfigFile string
 	// the instance specified by the user
 	flagInstance string
-	// the color specified by the user
-	flagColor string
+	// the value specified by the user
+	flagValue string
+	// contention level
+	flagLevel uint
 
 	// configFile will be read into this file
 	cfgQuorum *config.QuorumConfig
@@ -28,13 +30,13 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "student_22_BFT_Baxos",
-	Short: "Client CLI for Colory",
-	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+	Short: "Client CLI for BFTBaxos",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		fmt.Println("the default quorum file path is: ", flagConfigFile)
 		//load the quorum configuration from file
 		cfgQuorum, err = config.NewQuorumConfig(flagConfigFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "load config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "load quorum config: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -52,8 +54,8 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	cfgInstances = make(map[string]string)
-	rootCmd.PersistentFlags().StringVar(&flagConfigFile, "config", "doc/config/quorum.yml", "colory quorum configuration file")
-	rootCmd.PersistentFlags().StringVar(&flagColor, "color", "green", "specify the color you want to paint")
+	rootCmd.PersistentFlags().StringVar(&flagConfigFile, "config", "../doc/config/quorum.yml", "instance quorum configuration file")
+	rootCmd.PersistentFlags().StringVar(&flagValue, "value", "green", "indicate the value you want to achieve consensus")
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

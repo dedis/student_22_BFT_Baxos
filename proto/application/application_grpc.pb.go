@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ApplicationClient interface {
-	Paint(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
+	Propose(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
 }
 
 type applicationClient struct {
@@ -33,9 +33,9 @@ func NewApplicationClient(cc grpc.ClientConnInterface) ApplicationClient {
 	return &applicationClient{cc}
 }
 
-func (c *applicationClient) Paint(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+func (c *applicationClient) Propose(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
 	out := new(Response)
-	err := c.cc.Invoke(ctx, "/Application/Paint", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/Application/Propose", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (c *applicationClient) Paint(ctx context.Context, in *Request, opts ...grpc
 // All implementations must embed UnimplementedApplicationServer
 // for forward compatibility
 type ApplicationServer interface {
-	Paint(context.Context, *Request) (*Response, error)
+	Propose(context.Context, *Request) (*Response, error)
 	mustEmbedUnimplementedApplicationServer()
 }
 
@@ -54,8 +54,8 @@ type ApplicationServer interface {
 type UnimplementedApplicationServer struct {
 }
 
-func (UnimplementedApplicationServer) Paint(context.Context, *Request) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Paint not implemented")
+func (UnimplementedApplicationServer) Propose(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Propose not implemented")
 }
 func (UnimplementedApplicationServer) mustEmbedUnimplementedApplicationServer() {}
 
@@ -70,20 +70,20 @@ func RegisterApplicationServer(s grpc.ServiceRegistrar, srv ApplicationServer) {
 	s.RegisterService(&Application_ServiceDesc, srv)
 }
 
-func _Application_Paint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Application_Propose_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Request)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApplicationServer).Paint(ctx, in)
+		return srv.(ApplicationServer).Propose(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Application/Paint",
+		FullMethod: "/Application/Propose",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApplicationServer).Paint(ctx, req.(*Request))
+		return srv.(ApplicationServer).Propose(ctx, req.(*Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -96,8 +96,8 @@ var Application_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ApplicationServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Paint",
-			Handler:    _Application_Paint_Handler,
+			MethodName: "Propose",
+			Handler:    _Application_Propose_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

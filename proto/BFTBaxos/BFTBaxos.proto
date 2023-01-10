@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "proto/google/protobuf/empty.proto";
-
 option go_package="./";
 
 //Phase 1: Prepare-Promise phase
@@ -9,29 +7,30 @@ message PrepareMsg {
   string From = 1;
   // Safety
   uint64 Ballot = 2;
-
   // Liveness
-  float K = 3;
-  repeated BFTTimeStamp  TimeStamp = 4;
+  double K = 3;
+  bytes KProof = 4;
+  repeated BFTTimeStamp  TimeStamp = 5;
   // if ballot is ID of node no need for BallotQC (the first try)
-  optional BallotQuorumCert BallotQC = 5;
+  optional QuorumCert BallotQC = 6;
 }
 
 message PromiseMsg {
   bool Contention = 1;
   uint64 Ballot = 2;
   // optional Ballot previously accepted
-  optional uint64 AcceptedBallot = 3;
+  bool Accepted = 3;
+  optional uint64 AcceptedBallot = 4;
   // optional Value previously accepted
-  optional string AcceptedValue = 4;
+  optional string AcceptedValue = 5;
+  // consider add <Ballot, AcceptedBallot, AcceptedValue> later
+  // ECDSASignature PromiseCert = 5;
   // optional QC for AcceptedValue
-  optional AcceptQuorumCert PreAcceptQC= 5;
-
+  optional QuorumCert PreAcceptQC= 6;
   // Liveness
-  BFTTimeStamp  TimeStamp = 6;
-  // Partial signature over the NextBallot
-  uint64 NextBallot = 7;
-  PartialSignature BallotSig = 8;
+  BFTTimeStamp  TimeStamp = 7;
+  // < Phase, NextBallot >
+  PartialCert BallotPartCert = 8;
 }
 
 //Phase 2: Pre_Propose-Pre_Accept phase
@@ -48,27 +47,17 @@ message PreProposeMsg {
 // Used in both phase2 and phase3
 message AcceptMsg {
   bool Contention = 1;
-  uint64 Phase = 2;
-  uint64 Ballot = 3;
-  // Value are pre_accepted/accepted
-  string AcceptValue = 4;
-  // Partial signature over the tuple < Phase, Ballot, AcceptValue >
-  PartialSignature SafetySig = 5;
 
+  uint64 Phase = 2;  //1 phase2 2 phase 3
+  uint64 Ballot = 3;
+  string AcceptValue = 4; // Value are pre_accepted/accepted
+  // Partial signature over the tuple < Phase, Ballot, AcceptValue >
+  PartialCert AcceptPartCert = 5;
   // Liveness
   BFTTimeStamp TimeStamp = 6;
-  // Partial signature over the NextBallot
-  uint64 NextBallot = 7;
-  PartialSignature BallotSig = 8;
-}
-
-message AcceptQuorumCert {
-  uint64 Phase = 1;
-  uint64 Ballot = 2;
-  // Value are pre_accepted/accepted
-  string AcceptValue = 3;
-  // QuorumSignature is combined from a quorum of partial signature
-  QuorumSignature Sig = 4;
+  // Partial signature over the NextBallot < Phase, NextBallot >
+  // now we only provide it in prepare-promise phase
+  // PartialCert BallotPartCert = 7;
 }
 
 //Phase 3: Propose-Accept phase
@@ -77,7 +66,7 @@ message ProposeMsg {
   uint64 Ballot = 2;
   string ProposeValue = 3;
 
-  AcceptQuorumCert PreAcceptQC = 4;
+  QuorumCert PreAcceptQC = 4;
 
 }
 //Commit
@@ -86,38 +75,48 @@ message CommitMsg {
   uint64 Ballot = 2;
   string CommitValue = 3;
 
-  AcceptQuorumCert AcceptQC = 4;
+  QuorumCert AcceptQC = 4;
 
 }
 
-// crypto part
-message PartialSignature {
-  //????
+message ECDSASignature {
+  string Signer = 1;
+  bytes R = 2;
+  bytes S = 3;
 }
 
-message QuorumSignature {
-  //????
+message Signature {
+  string Signer = 1;
+  bytes signature = 2;
+}
+
+message PartialCert {
+  Signature Sig = 1;
+  uint64 type= 2;  // 1: phase2 2: phase3 3: nextBallot
+}
+
+message QuorumCert {
+  repeated Signature Sigs = 1;
+  uint64 type= 2;  // 1: phase2 2: phase3 3: nextBallot
+  bytes Hash = 3;
 }
 
 // backoff part
-
-message BallotQuorumCert {
-  uint64 NextBallot = 1;
-  QuorumSignature BallotSig = 2;
-}
-
 message BFTTimeStamp {
   string Singer = 1;
   uint64 Ballot = 2;
   int64 Timestamp = 3;
-  // We might need to attach a hash for <Singer, Ballot, Timestamp>
+  // We need to attach a hash for <Singer, Ballot, Timestamp>
+  // But I have no time now, let's leave this backdoor for hacker!
   //bytes Hash = 4;
 }
+
+message Empty {}
 
 service BFTBaxos {
   rpc Promise (PrepareMsg) returns (PromiseMsg);
   rpc PreAccept (PreProposeMsg) returns (AcceptMsg);
   rpc Accept (ProposeMsg) returns (AcceptMsg);
-  rpc Commit (CommitMsg) returns (google.protobuf.Empty);
+  rpc Commit (CommitMsg) returns (Empty);
 }
 

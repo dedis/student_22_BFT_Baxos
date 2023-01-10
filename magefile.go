@@ -8,10 +8,12 @@ import (
 )
 
 var (
-	//Default = Build
-	//targets = []string{"skinnyd", "skinnyctl"}
-	//protos = []string{"consensus"}
-	protos = []string{"BFTBaxos", "application"}
+	// Default = Build
+	// targets = []string{"skinnyd", "skinnyctl"}
+	// protos = []string{"consensus"}
+	// protos = []string{"BFTBaxos", "application"}
+	// protos = []string{"application"}
+	protos = []string{"BFTBaxos"}
 )
 
 // Install build dependencies.

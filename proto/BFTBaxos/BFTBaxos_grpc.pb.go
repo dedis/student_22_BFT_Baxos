@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -26,7 +25,7 @@ type BFTBaxosClient interface {
 	Promise(ctx context.Context, in *PrepareMsg, opts ...grpc.CallOption) (*PromiseMsg, error)
 	PreAccept(ctx context.Context, in *PreProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error)
 	Accept(ctx context.Context, in *ProposeMsg, opts ...grpc.CallOption) (*AcceptMsg, error)
-	Commit(ctx context.Context, in *CommitMsg, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Commit(ctx context.Context, in *CommitMsg, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type bFTBaxosClient struct {
@@ -64,8 +63,8 @@ func (c *bFTBaxosClient) Accept(ctx context.Context, in *ProposeMsg, opts ...grp
 	return out, nil
 }
 
-func (c *bFTBaxosClient) Commit(ctx context.Context, in *CommitMsg, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *bFTBaxosClient) Commit(ctx context.Context, in *CommitMsg, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
 	err := c.cc.Invoke(ctx, "/BFTBaxos/Commit", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -80,7 +79,7 @@ type BFTBaxosServer interface {
 	Promise(context.Context, *PrepareMsg) (*PromiseMsg, error)
 	PreAccept(context.Context, *PreProposeMsg) (*AcceptMsg, error)
 	Accept(context.Context, *ProposeMsg) (*AcceptMsg, error)
-	Commit(context.Context, *CommitMsg) (*emptypb.Empty, error)
+	Commit(context.Context, *CommitMsg) (*Empty, error)
 	mustEmbedUnimplementedBFTBaxosServer()
 }
 
@@ -97,7 +96,7 @@ func (UnimplementedBFTBaxosServer) PreAccept(context.Context, *PreProposeMsg) (*
 func (UnimplementedBFTBaxosServer) Accept(context.Context, *ProposeMsg) (*AcceptMsg, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Accept not implemented")
 }
-func (UnimplementedBFTBaxosServer) Commit(context.Context, *CommitMsg) (*emptypb.Empty, error) {
+func (UnimplementedBFTBaxosServer) Commit(context.Context, *CommitMsg) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Commit not implemented")
 }
 func (UnimplementedBFTBaxosServer) mustEmbedUnimplementedBFTBaxosServer() {}

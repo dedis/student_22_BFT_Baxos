@@ -26,28 +26,30 @@ var (
 	ErrDuplicateInstance = errors.New("duplicate instance")
 )
 
-// Instance describes a single Colory instance connection information
+// Instance describes a single BFTBaxos instance connection information
 type Instance struct {
 	Name    string `yaml:"name"`
 	Address string `yaml:"address"`
 }
 
-// InstanceConfig describes a Colory instance configuration
+// InstanceConfig describes a BFTBaxos instance configuration
 type InstanceConfig struct {
-	Name      string        `yaml:"name"`
-	Increment uint64        `yaml:"increment"`
-	Timeout   time.Duration `yaml:"timeout"`
-	Listen    string        `yaml:"listen"`
-	Peers     []Instance    `yaml:"peers"`
+	Name       string        `yaml:"name"`
+	Increment  uint64        `yaml:"increment"`
+	F          int           `yaml:"f"`
+	Timeout    time.Duration `yaml:"timeout"`
+	Listen     string        `yaml:"listen"`
+	NumOfPeers int           `yaml:"numOfPeers"`
+	Peers      []Instance    `yaml:"peers"`
 }
 
-// QuorumConfig describes a Colory quorum configuration file
+// QuorumConfig describes a BFTBaxos quorum configuration file
 type QuorumConfig struct {
 	Timeout   time.Duration `yaml:"timeout"`
 	Instances []Instance    `yaml:"instances"`
 }
 
-// NewInstanceConfig loads Colory instance configuration from given file
+// NewInstanceConfig loads BFTBaxos instance configuration from given file
 func NewInstanceConfig(fname string) (*InstanceConfig, error) {
 	var cfg InstanceConfig
 
@@ -74,10 +76,10 @@ func NewInstanceConfig(fname string) (*InstanceConfig, error) {
 	}
 
 	return &cfg, nil
-	
+
 }
 
-// NewQuorumConfig loads a Colory quorum configuration from given file
+// NewQuorumConfig loads a BFTBaxos quorum configuration from given file
 func NewQuorumConfig(fname string) (*QuorumConfig, error) {
 	cfg := &QuorumConfig{}
 	data, err := os.ReadFile(fname)

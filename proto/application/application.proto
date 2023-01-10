@@ -9,5 +9,5 @@ message Response {
 }
 
 service Application {
-  rpc Paint(Request) returns (Response);
+  rpc Propose(Request) returns (Response);
 }
