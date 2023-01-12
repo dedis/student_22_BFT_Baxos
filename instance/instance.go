@@ -27,6 +27,7 @@ type Instance struct {
 	// basic
 	nextBallotQC      *QuorumCertificate
 	increment         uint64
+	prepareBallot     uint64
 	promisedBallot    uint64             // promised ballotNumber
 	promiseSet        []*verifiedPromise // promise set
 	preAcceptedBallot uint64             // preAccepted ballotNumber
@@ -71,7 +72,8 @@ func New(name string, increment uint64, timeout time.Duration, f int) *Instance 
 		KeyStore: KeyStore{
 			PublicKey: make(map[string]ed25519.PublicKey),
 		},
-		f: f,
+		f:             f,
+		roundTripTime: time.Second,
 	}
 	// initialize retry table
 	for _, p := range in.peers {

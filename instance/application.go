@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/yoseplee/vrf"
 	"math"
-	"os"
 	pb "student_22_BFT_Baxos/proto/application"
 	"time"
 )
@@ -28,7 +27,11 @@ retry:
 		proof, vrfOutput, _ := vrf.Prove(in.KeyStore.PublicKey[in.name], in.KeyStore.PrivateKey, Int64ToBytes(median))
 		KProof = proof
 		K = HashRatio(vrfOutput)
+		fmt.Println("K: ", K)
+		fmt.Println("retries: ", in.retries)
+		fmt.Println("RTT: ", in.roundTripTime.Microseconds())
 		backOffTime := int64(K*math.Pow(3, float64(in.retries))) * in.roundTripTime.Microseconds()
+		fmt.Println("backoff time: ", backOffTime)
 		backoff := time.Duration(backOffTime) * time.Microsecond
 		// backoff at here
 		time.Sleep(backoff)
@@ -53,7 +56,6 @@ retry:
 			proposed := in.propose(retry, 2)
 			if !proposed { // if the phase 3 fail due to contention
 				fmt.Println("node: " + in.name + " retry phase 3")
-				os.Exit(-1)
 				retry = true
 				goto retry
 			} else {

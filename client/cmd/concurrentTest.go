@@ -23,9 +23,11 @@ var testCmd = &cobra.Command{
 	Short: "concurrent testing",
 	Run: func(cmd *cobra.Command, args []string) {
 		var wg sync.WaitGroup
+		wg.Add(2)
 		fmt.Println("11111")
 		go func() {
-			wg.Add(1)
+			defer wg.Done()
+
 			// connect to instance by checking the address table
 			address := cfgInstances["1"]
 			fmt.Printf("connecting to %v (%v)\n", flagInstance, address)
@@ -53,7 +55,8 @@ var testCmd = &cobra.Command{
 		}()
 
 		go func() {
-			wg.Add(1)
+			defer wg.Done()
+
 			// connect to instance by checking the address table
 			address := cfgInstances["2"]
 			fmt.Printf("connecting to %v (%v)\n", flagInstance, address)
@@ -79,6 +82,7 @@ var testCmd = &cobra.Command{
 			fmt.Println(resp.Result)
 			fmt.Println("take ", time.Now().Sub(startTime), " to reach consensus")
 		}()
+
 		fmt.Println("2222")
 		wg.Wait()
 	},

@@ -15,7 +15,7 @@ func (in *Instance) getPrepareMsg(retry bool, K float64, KProof []byte) pb.Prepa
 	if !retry {
 		return pb.PrepareMsg{
 			From:   in.name,
-			Ballot: in.promisedBallot,
+			Ballot: in.prepareBallot,
 		}
 	}
 
@@ -26,7 +26,7 @@ func (in *Instance) getPrepareMsg(retry bool, K float64, KProof []byte) pb.Prepa
 	//retry
 	return pb.PrepareMsg{
 		From:      in.name,
-		Ballot:    in.promisedBallot,
+		Ballot:    in.prepareBallot,
 		K:         K,
 		KProof:    KProof,
 		TimeStamp: timeStamps,
@@ -115,7 +115,7 @@ func (in *Instance) checkPromiseSet(
 	highestBallot := uint64(0)
 	highestValue := ""
 
-	//fmt.Println("promise set size: ", len(resp))
+	fmt.Println("promise set size: ", len(resp))
 
 	for _, r := range resp {
 		v, ok := in.getVerifiedPromise(r)
@@ -131,7 +131,7 @@ func (in *Instance) checkPromiseSet(
 	// only count promise with valid QC
 	if !in.isMajority(len(verifiedPromise)) {
 		//fmt.Println("valid promise size: ", len(verifiedPromise))
-		//fmt.Println("promise set be false at here 1")
+		fmt.Println("promise set be false at here 1")
 		return false
 	}
 	if highestValue == "" {
@@ -139,7 +139,7 @@ func (in *Instance) checkPromiseSet(
 	}
 	// check if the pre_propose/propose value is the highest value
 	if highestValue != prProposeValue {
-		//fmt.Println("promise set be false at here 2")
+		fmt.Println("promise set be false at here 2")
 		return false
 	}
 	return false
@@ -280,8 +280,10 @@ func (in *Instance) getAccept(resp *pb.AcceptMsg) acceptMsg {
 		phase:       resp.GetPhase(),
 		ballot:      resp.GetBallot(),
 		acceptColor: resp.GetAcceptValue(),
-		acceptPC:    RestorePC(resp.GetAcceptPartCert()),
 		timeStamp:   RestoreTimeStamp(resp.GetTimeStamp()),
+	}
+	if !accept.contention {
+		accept.acceptPC = RestorePC(resp.GetAcceptPartCert())
 	}
 
 	return accept
@@ -329,7 +331,6 @@ func RestoreQC(cert *pb.QuorumCert) *QuorumCertificate {
 
 // CombineQC (only the valid pcs can be placed in the pcs)
 func (in *Instance) CombineQC(pcs []*PartCertificate) *QuorumCertificate {
-	fmt.Println(in.name, " enter combineQC")
 	qc := QuorumCertificate{}
 	var signatures []*EDDSA.Signature
 	//verify single signature
