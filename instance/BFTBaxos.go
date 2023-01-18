@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yoseplee/vrf"
 	"math"
+	"strconv"
 	pb "student_22_BFT_Baxos/proto/BFTBaxos"
 	"sync"
 	"time"
@@ -13,23 +14,48 @@ import (
 
 // Promise promises a ballot or refuse a ballot
 func (in *Instance) Promise(ctx context.Context, prepare *pb.PrepareMsg) (*pb.PromiseMsg, error) {
+	// Set a manual delay
+
 	var promise pb.PromiseMsg
 	in.mu.Lock()
 	defer in.mu.Unlock()
 
 	if in.retryTable[prepare.From] != 0 {
 		median := GetMedianTimestampFromMsg(prepare.TimeStamp)
-		verified, _ := vrf.Verify(in.KeyStore.PublicKey[prepare.From], prepare.KProof, Int64ToBytes(median))
+		//fmt.Println("kproof", prepare.KProof)
+		//fmt.Println("median", median)
+		//fmt.Println("all ts: ", prepare.TimeStamp)
+		verified, err := vrf.Verify(in.KeyStore.PublicKey[prepare.From], prepare.KProof, Int64ToBytes(median))
 		if !verified {
+			fmt.Println("vrf wrong: ", err)
 			return &promise, nil
 		}
 		// converts proof(pi) into vrf output(hash) without verifying it
 		vrfOutput := vrf.Hash(prepare.KProof)
 		K := HashRatio(vrfOutput) * 3
-		backOffTime := int64(K*math.Pow(2, float64(in.retries))) * in.roundTripTime.Microseconds()
-		waiting := time.Now().Unix() - backOffTime
-		time.Sleep(time.Duration(waiting))
+		expectedDuration := K * math.Pow(2, float64(in.retries)) * float64(in.roundTripTime.Microseconds())
+		//fmt.Println("median time: ", median)
+		//fmt.Println("expectedDuration: ", expectedDuration)
+		backoffDuration := time.Now().UnixMicro() - median
+		fmt.Println("backoffDuration: ", backoffDuration)
+		waiting := float64(backoffDuration) - expectedDuration
+		//fmt.Println("Waiting: ", waiting)
+		if waiting > 0 {
+			fmt.Println("sleeping")
+			time.Sleep(time.Duration(waiting))
+		}
 	}
+	// verify BallotQC if the Ballot number is not 1
+	if prepare.Ballot != 1 {
+		// verify the nextBallotQC, convert tuple < Phase, Ballot, Ballot > to bytes
+		bytes := ByteTuple(uint64(3), prepare.Ballot, strconv.FormatUint(prepare.Ballot, 10))
+
+		if !in.verifyQC(RestoreQC(prepare.BallotQC), bytes) {
+			fmt.Println("nil promise return")
+			return nil, errors.New("NextBallotQC wrong")
+		}
+	}
+	// count the  number of retry
 	in.retryTable[prepare.From]++
 
 	// promise or not
@@ -58,28 +84,39 @@ func (in *Instance) Promise(ctx context.Context, prepare *pb.PrepareMsg) (*pb.Pr
 	// attach the time stamp
 	promise.TimeStamp = in.generateTimeStamp(prepare.Ballot)
 	// provide the next ballot number partial signature
-	//promise.NextBallot = prepare.Ballot + uint64(len(in.peers)) + 1
 	cert := in.generateBallotPartCert(prepare.Ballot + 1)
 	promise.BallotPartCert = cert
+	fmt.Println("---", promise.Ballot)
 	return &promise, nil
 }
 
 // prepare initiate the BFTBaxos instance and asks the quorum to promise on a ballot number
 func (in *Instance) prepare(retry bool, K float64, KProof []byte) bool {
 	in.mu.Lock()
-	// cleanup promise set
-	in.promiseSet = nil
-	// promise to myself
-	//in.prepareBallot += in.increment
+
 	in.prepareBallot += 1
 	fmt.Println(in.name, " initiate prepare phase with ballot number", in.prepareBallot)
 
-	//my promise
-	in.promisedBallot = in.prepareBallot
+	if in.prepareBallot > in.promisedBallot {
+		// promise to myself
+		in.promisedBallot = in.prepareBallot
+
+	}
+
+	// new consensus instance
+	promises := make(chan *verifiedPromise)
+	prepareMsg := in.getPrepareMsg(retry, K, KProof)
+
+	// cleanup promise set
+	in.promiseSet = nil
+	// cleanup backoff mechanism parameter
+	in.timeStampSet = nil
+
+	//add my promise
 	myPromise := &verifiedPromise{
 		contention: false,
 		ballot:     in.prepareBallot,
-		timeStamp:  RestoreTimeStamp(in.generateTimeStamp(in.promisedBallot)),
+		timeStamp:  RestoreTimeStamp(in.generateTimeStamp(in.prepareBallot)),
 		ballotPC:   RestorePC(in.generateBallotPartCert(in.prepareBallot + 1)),
 	}
 	if in.acceptedValue != "" {
@@ -89,13 +126,15 @@ func (in *Instance) prepare(retry bool, K float64, KProof []byte) bool {
 	}
 	in.promiseSet = append(in.promiseSet, myPromise)
 
+	// add my nextBallotPC
+	myNextBallot := in.generateBallotPartCert(in.prepareBallot + 1)
+	nextBallotPCs := []*PartCertificate{RestorePC(myNextBallot)}
+
+	// add my timeStamp
+	myTimeStamp := in.generateTimeStamp(in.prepareBallot)
+	in.timeStampSet = append(in.timeStampSet, RestoreTimeStamp(myTimeStamp))
+
 	in.mu.Unlock()
-
-	promises := make(chan *verifiedPromise)
-	prepareMsg := in.getPrepareMsg(retry, K, KProof)
-
-	// cleanup backoff mechanism parameter
-	in.timeStampSet = nil
 
 	ctx, cancel := context.WithTimeout(context.Background(), in.timeout)
 	// We cancel as soon as we have a majority to speed things up.
@@ -119,10 +158,13 @@ func (in *Instance) prepare(retry bool, K float64, KProof []byte) bool {
 				fmt.Println(err)
 				return
 			}
-			fmt.Println("get promise resp from node ")
 			in.roundTripTime = time.Now().Sub(startTime) // no mutex needed for roundTripTime variable because it can be stale without affecting correctness
 
 			// We must collect quorum size responses which has valid QC
+			//fmt.Println("receiving promise message from", p.name)
+			//fmt.Println("timestamp:", resp.GetTimeStamp())
+			//fmt.Println("ballot:", resp.Ballot)
+			//fmt.Println("ballot:", resp.GetBallot())
 			vp, valid := in.getVerifiedPromise(resp)
 			if valid {
 				//only collect "valid" promise message
@@ -152,15 +194,7 @@ func (in *Instance) prepare(retry bool, K float64, KProof []byte) bool {
 
 	// count the vote
 	yea, nay := 1, 0
-	// add our own nextBallotPC
-	myNextBallot := in.generateBallotPartCert(in.promisedBallot + 1)
-	//fmt.Println("My next ballot: ", myNextBallot)
-	nextBallotPCs := []*PartCertificate{RestorePC(myNextBallot)}
-	// add our own timeStamp
-	myTimeStamp := in.generateTimeStamp(in.promisedBallot)
-	//fmt.Println("My timeStamp: ", myTimeStamp)
-	in.timeStampSet = append(in.timeStampSet, RestoreTimeStamp(myTimeStamp))
-	//fmt.Println("my timestamp set", in.timeStampSet)
+
 	var highestSeenAcceptedBallot = uint64(0)
 	var highestSeenAcceptedColor = ""
 	canceled := false
@@ -189,12 +223,12 @@ func (in *Instance) prepare(retry bool, K float64, KProof []byte) bool {
 
 		// collect partial signature for next ballot number
 		//if the PC is what we expected
-		if in.checkBallotPartCert(in.promisedBallot+1, r.ballotPC) {
+		if in.checkBallotPartCert(in.prepareBallot+1, r.ballotPC) {
 			//add into list
 			nextBallotPCs = append(nextBallotPCs, r.ballotPC)
 			// combine when quorum
 			if in.isMajority(len(nextBallotPCs)) {
-				fmt.Println("combine next ballot QC")
+				fmt.Println("generate ballot QC successfully")
 				in.nextBallotQC = in.CombineQC(nextBallotPCs)
 			}
 		}
@@ -229,7 +263,6 @@ func (in *Instance) PreAccept(ctx context.Context, prePropose *pb.PreProposeMsg)
 		fmt.Println("invalid promise set")
 		return nil, errors.New("invalid promise set")
 	}
-	fmt.Println(in.name, " valid promise set")
 	// ballot of prePropose should equal to promised one
 	if prePropose.Ballot >= in.promisedBallot {
 		//pre accept this ballot number
@@ -248,12 +281,12 @@ func (in *Instance) PreAccept(ctx context.Context, prePropose *pb.PreProposeMsg)
 		cert := in.generatePartCert(bytes)
 		cert.Type = preAccept.Phase
 		preAccept.AcceptPartCert = cert
-		fmt.Println(in.name, " pre-accept from ", prePropose.From, " with ballot number ", prePropose.Ballot)
+		//fmt.Println(in.name, " pre-accept from ", prePropose.From, " with ballot number ", prePropose.Ballot)
 	} else {
 		preAccept.Contention = true
 		preAccept.Phase = 1
 		preAccept.Ballot = prePropose.Ballot
-		fmt.Println(in.name, " refuse to pre-accept from ", prePropose.From, " with ballot number ", prePropose.Ballot)
+		//fmt.Println(in.name, " refuse to pre-accept from ", prePropose.From, " with ballot number ", prePropose.Ballot)
 	}
 	// attach the time stamp
 	preAccept.TimeStamp = in.generateTimeStamp(prePropose.Ballot)
@@ -262,7 +295,7 @@ func (in *Instance) PreAccept(ctx context.Context, prePropose *pb.PreProposeMsg)
 }
 
 func (in *Instance) Accept(ctx context.Context, propose *pb.ProposeMsg) (*pb.AcceptMsg, error) {
-	fmt.Println(in.name, " enter accept phase")
+	//fmt.Println(in.name, " enter accept phase")
 	var accept pb.AcceptMsg
 
 	in.mu.Lock()
@@ -288,12 +321,12 @@ func (in *Instance) Accept(ctx context.Context, propose *pb.ProposeMsg) (*pb.Acc
 		cert := in.generatePartCert(bytes)
 		cert.Type = accept.Phase
 		accept.AcceptPartCert = cert
-		fmt.Println(in.name, " accept from ", propose.From, " with ballot number ", propose.Ballot)
+		//fmt.Println(in.name, " accept from ", propose.From, " with ballot number ", propose.Ballot)
 	} else {
 		accept.Contention = true
 		accept.Phase = 2
 		accept.Ballot = propose.Ballot
-		fmt.Println(in.name, " refuse to accept from ", propose.From, " with ballot number ", propose.Ballot)
+		//fmt.Println(in.name, " refuse to accept from ", propose.From, " with ballot number ", propose.Ballot)
 	}
 	// attach the time stamp
 	accept.TimeStamp = in.generateTimeStamp(propose.Ballot)
@@ -308,8 +341,8 @@ func (in *Instance) Accept(ctx context.Context, propose *pb.ProposeMsg) (*pb.Acc
 	return &accept, nil
 }
 
-func (in *Instance) propose(retry bool, phase uint64) bool {
-	fmt.Println(in.name, " enter propose phase")
+func (in *Instance) propose(phase uint64) bool {
+	//fmt.Println(in.name, " enter propose phase")
 	in.mu.Lock()
 	// cleanup timeStampSet
 	in.timeStampSet = nil
@@ -420,13 +453,11 @@ func (in *Instance) propose(retry bool, phase uint64) bool {
 		//fmt.Println("phase ", phase, " the len of qc ", len(acceptPCs))
 		// combine when quorum safely!
 		if in.isMajority(len(acceptPCs)) && phase == 1 && in.preAcceptQC == nil {
-			fmt.Println("combine preAccept QC")
+			//fmt.Println("combine preAccept QC")
 			in.preAcceptQC = in.CombineQC(acceptPCs)
 		} else if in.isMajority(len(acceptPCs)) && phase == 2 && in.acceptQC == nil {
-			//fmt.Println("phase ", phase, " try to combine qc ")
-			fmt.Println("combine accept QC")
+			//fmt.Println("combine accept QC")
 			in.acceptQC = in.CombineQC(acceptPCs)
-			//fmt.Println(in.acceptQC.Hash)
 		}
 		in.mu.Unlock()
 		// stop counting as soon as contention has a majority
@@ -447,8 +478,8 @@ func (in *Instance) propose(retry bool, phase uint64) bool {
 			}
 		}
 	}
-	fmt.Println("yea: ", yea)
-	fmt.Println("quorum", quorumCertificate)
+	//fmt.Println("yea: ", yea)
+	//fmt.Println("quorum", quorumCertificate)
 	return in.isMajority(yea) && quorumCertificate
 }
 
@@ -464,7 +495,8 @@ func (in *Instance) Commit(ctx context.Context, commitMsg *pb.CommitMsg) (*pb.Em
 			return nil, errors.New("AcceptQC wrong")
 		}
 		in.committed = append(in.committed, in.acceptedValue)
-		fmt.Println(in.name, " commit ", in.acceptedValue)
+		fmt.Println(in.name, " Commit ", in.acceptedValue)
+		fmt.Println("--------------------------")
 	}
 
 	//clean up
@@ -480,7 +512,8 @@ func (in *Instance) Commit(ctx context.Context, commitMsg *pb.CommitMsg) (*pb.Em
 func (in *Instance) commit() {
 	// commit locally
 	in.mu.Lock()
-	fmt.Println(in.name, " commit ", in.acceptedValue)
+	fmt.Println(in.name, " Commit ", in.acceptedValue)
+	fmt.Println("--------------------------")
 	in.committed = append(in.committed, in.acceptedValue)
 	in.mu.Unlock()
 	//snapshot the current status

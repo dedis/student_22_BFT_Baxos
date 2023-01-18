@@ -7,10 +7,15 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
+	"strconv"
+	"student_22_BFT_Baxos/polypus"
+	"student_22_BFT_Baxos/polypus/lib/polylib"
 	"student_22_BFT_Baxos/proto/application"
 	"sync"
 	"time"
 )
+
+const defaultNumPeers = 3
 
 func init() {
 	rootCmd.AddCommand(testCmd)
@@ -22,68 +27,42 @@ var testCmd = &cobra.Command{
 	Use:   "test",
 	Short: "concurrent testing",
 	Run: func(cmd *cobra.Command, args []string) {
+		_, outWatch := polypus.InitPoly(3999)
+
 		var wg sync.WaitGroup
-		wg.Add(2)
-		fmt.Println("11111")
-		go func() {
-			defer wg.Done()
+		num := defaultNumPeers
+		wg.Add(defaultNumPeers)
 
-			// connect to instance by checking the address table
-			address := cfgInstances["1"]
-			fmt.Printf("connecting to %v (%v)\n", flagInstance, address)
-			// create connection
-			conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "dial: %v\n", err)
-				os.Exit(1)
-			}
-			defer conn.Close()
-			ctx, cancel := context.WithTimeout(context.Background(), cfgQuorum.Timeout)
-			defer cancel()
+		for i := 1; i <= num; i++ {
+			go func(i int) {
+				defer wg.Done()
 
-			// try to propose value
-			fmt.Println("propsoe value: ", flagValue)
-			client := application.NewApplicationClient(conn)
-			startTime := time.Now()
-			// propose the value from the user
-			resp, err := client.Propose(ctx, &application.Request{Color: flagValue})
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Println(resp.Result)
-			fmt.Println("take ", time.Now().Sub(startTime), " to reach consensus")
-		}()
+				// connect to instance by checking the address table
+				name := strconv.Itoa(i)
+				address := cfgInstances[name]
+				fmt.Printf("connecting to %v (%v)\n", flagInstance, address)
+				// create connection
+				conn, err := grpc.Dial(address, polylib.GetDialInterceptor("client", address, outWatch), grpc.WithTransportCredentials(insecure.NewCredentials()))
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "dial: %v\n", err)
+				}
+				defer conn.Close()
+				ctx, cancel := context.WithTimeout(context.Background(), cfgQuorum.Timeout)
+				defer cancel()
 
-		go func() {
-			defer wg.Done()
-
-			// connect to instance by checking the address table
-			address := cfgInstances["2"]
-			fmt.Printf("connecting to %v (%v)\n", flagInstance, address)
-			// create connection
-			conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "dial: %v\n", err)
-				os.Exit(1)
-			}
-			defer conn.Close()
-			ctx, cancel := context.WithTimeout(context.Background(), cfgQuorum.Timeout)
-			defer cancel()
-
-			// try to propose value
-			fmt.Println("propsoe value: ", flagValue)
-			client := application.NewApplicationClient(conn)
-			startTime := time.Now()
-			// propose the value from the user
-			resp, err := client.Propose(ctx, &application.Request{Color: flagValue})
-			if err != nil {
-				fmt.Println(err)
-			}
-			fmt.Println(resp.Result)
-			fmt.Println("take ", time.Now().Sub(startTime), " to reach consensus")
-		}()
-
-		fmt.Println("2222")
+				// try to propose value
+				fmt.Println("propsoe value: ", flagValue)
+				client := application.NewApplicationClient(conn)
+				startTime := time.Now()
+				// propose the value from the user
+				resp, err := client.Propose(ctx, &application.Request{Color: flagValue})
+				if err != nil {
+					fmt.Println(err)
+				}
+				fmt.Println(resp.Result)
+				fmt.Println("take ", time.Now().Sub(startTime), " to reach consensus")
+			}(i)
+		}
 		wg.Wait()
 	},
 }

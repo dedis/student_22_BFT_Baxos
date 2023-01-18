@@ -7,6 +7,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
+	"student_22_BFT_Baxos/polypus"
+	"student_22_BFT_Baxos/polypus/lib/polylib"
 	"student_22_BFT_Baxos/proto/application"
 	"time"
 )
@@ -22,6 +24,8 @@ var proposeCmd = &cobra.Command{
 	Short: "choose a instance and the value to propose",
 	Long:  `chooses the instance instance and input a value you want to propose, it will initiate a consensus process within cluster`,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		_, outWatch := polypus.InitPoly(3999)
 		// select default instance if no one was specified
 		if flagInstance == "" {
 			flagInstance = cfgDefaultInstance
@@ -32,7 +36,7 @@ var proposeCmd = &cobra.Command{
 		address := cfgInstances[flagInstance]
 		fmt.Printf("connecting to %v (%v)\n", flagInstance, address)
 		// create connection
-		conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.Dial(address, polylib.GetDialInterceptor("client", address, outWatch), grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "dial: %v\n", err)
 			os.Exit(1)

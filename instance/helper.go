@@ -1,9 +1,9 @@
 package instance
 
 import (
-	"encoding/binary"
 	"fmt"
 	"sort"
+	"strconv"
 	"student_22_BFT_Baxos/EDDSA"
 	pb "student_22_BFT_Baxos/proto/BFTBaxos"
 	"time"
@@ -13,9 +13,18 @@ import (
 func (in *Instance) getPrepareMsg(retry bool, K float64, KProof []byte) pb.PrepareMsg {
 
 	if !retry {
-		return pb.PrepareMsg{
-			From:   in.name,
-			Ballot: in.prepareBallot,
+		// start from scratch
+		if in.prepareBallot > 1 {
+			return pb.PrepareMsg{
+				From:     in.name,
+				Ballot:   in.prepareBallot,
+				BallotQC: in.getQC(*in.nextBallotQC),
+			}
+		} else {
+			return pb.PrepareMsg{
+				From:   in.name,
+				Ballot: in.prepareBallot,
+			}
 		}
 	}
 
@@ -48,6 +57,7 @@ type verifiedPromise struct {
 
 func (in *Instance) getVerifiedPromise(resp *pb.PromiseMsg) (*verifiedPromise, bool) {
 	// check if the AcceptQuorumVert is valid
+
 	if resp.Accepted {
 		// restore the multiSignature
 		multiSig := EDDSA.RestoreMultiSignature(resp.GetPreAcceptQC().GetSigs())
@@ -65,7 +75,7 @@ func (in *Instance) getVerifiedPromise(resp *pb.PromiseMsg) (*verifiedPromise, b
 			//verified
 			preAcceptQC: RestoreQC(resp.GetPreAcceptQC()),
 			timeStamp:   RestoreTimeStamp(resp.GetTimeStamp()),
-			ballotPC:    RestorePC(resp.BallotPartCert),
+			ballotPC:    RestorePC(resp.GetBallotPartCert()),
 		}
 		return &vPromise, true
 	}
@@ -75,7 +85,7 @@ func (in *Instance) getVerifiedPromise(resp *pb.PromiseMsg) (*verifiedPromise, b
 		accepted:   resp.GetAccepted(),
 		//verified
 		timeStamp: RestoreTimeStamp(resp.GetTimeStamp()),
-		ballotPC:  RestorePC(resp.BallotPartCert),
+		ballotPC:  RestorePC(resp.GetBallotPartCert()),
 	}
 	return &vPromise, true
 }
@@ -115,7 +125,7 @@ func (in *Instance) checkPromiseSet(
 	highestBallot := uint64(0)
 	highestValue := ""
 
-	fmt.Println("promise set size: ", len(resp))
+	//fmt.Println("promise set size: ", len(resp))
 
 	for _, r := range resp {
 		v, ok := in.getVerifiedPromise(r)
@@ -131,7 +141,6 @@ func (in *Instance) checkPromiseSet(
 	// only count promise with valid QC
 	if !in.isMajority(len(verifiedPromise)) {
 		//fmt.Println("valid promise size: ", len(verifiedPromise))
-		fmt.Println("promise set be false at here 1")
 		return false
 	}
 	if highestValue == "" {
@@ -139,7 +148,6 @@ func (in *Instance) checkPromiseSet(
 	}
 	// check if the pre_propose/propose value is the highest value
 	if highestValue != prProposeValue {
-		fmt.Println("promise set be false at here 2")
 		return false
 	}
 	return false
@@ -163,7 +171,7 @@ func (in *Instance) generateTimeStamp(ballot uint64) *pb.BFTTimeStamp {
 	return &pb.BFTTimeStamp{
 		Singer:    in.name,
 		Ballot:    ballot,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now().UnixMicro(),
 	}
 }
 
@@ -203,6 +211,9 @@ type PartCertificate struct {
 func RestorePC(cert *pb.PartialCert) *PartCertificate {
 	var pc PartCertificate
 	pc.Type = cert.GetType()
+	if cert.GetSig() == nil {
+		fmt.Println("nil Sig")
+	}
 	pc.Sigs = EDDSA.RestoreSignature(cert.GetSig())
 	return &pc
 }
@@ -218,7 +229,7 @@ func (in *Instance) getPC(pc PartCertificate) *pb.PartialCert {
 }
 
 func (in *Instance) generatePartCert(bytes []byte) *pb.PartialCert {
-	fmt.Println(in.name, " generates the PC")
+	//fmt.Println(in.name, " generates the PC")
 	// sign this tuple
 	sig := EDDSA.Sign(bytes, in.KeyStore.PrivateKey, in.name)
 	//get the partial certificate
@@ -239,27 +250,28 @@ func (in *Instance) checkPartCert(message []byte, pc *PartCertificate) bool {
 }
 
 func (in *Instance) generateBallotPartCert(next uint64) *pb.PartialCert {
-
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], next)
+	bytes := ByteTuple(uint64(3), next, strconv.FormatUint(next, 10))
 	// sign this ballot
-	sig := EDDSA.Sign(buf[:], in.KeyStore.PrivateKey, in.name)
+	sig := EDDSA.Sign(bytes, in.KeyStore.PrivateKey, in.name)
 	//get the partial certificate
 	cert := &pb.PartialCert{
 		Sig: &pb.Signature{
 			Signer:    sig.Signer(),
 			Signature: sig.Sig(),
 		},
+		Type: 3,
 	}
 	return cert
 }
 
 func (in *Instance) checkBallotPartCert(next uint64, pc *PartCertificate) bool {
-	var buf [8]byte
-	binary.LittleEndian.PutUint64(buf[:], next)
-
+	// check type of partial certificate
+	if pc.Type != 3 {
+		return false
+	}
+	bytes := ByteTuple(uint64(3), next, strconv.FormatUint(next, 10))
 	// check signature
-	return EDDSA.VerifySingleMsg(pc.Sigs, buf[:], in.KeyStore.PublicKey[pc.Sigs.Signer()])
+	return EDDSA.VerifySingleMsg(pc.Sigs, bytes, in.KeyStore.PublicKey[pc.Sigs.Signer()])
 }
 
 // phase 2 and 3 data structure
@@ -358,10 +370,10 @@ func (in *Instance) getQC(qc QuorumCertificate) *pb.QuorumCert {
 }
 
 func (in *Instance) verifyQC(qc *QuorumCertificate, messages []byte) bool {
-	fmt.Println(in.name, " enter verifyQC")
+	//fmt.Println(in.name, " enter verifyQC")
 	multiSig, err := EDDSA.Combine(qc.Sigs)
 	if err != nil {
-		fmt.Println("verifyQC err ")
+		fmt.Println(err)
 		return false
 	}
 

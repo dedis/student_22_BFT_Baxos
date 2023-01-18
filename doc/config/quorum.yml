@@ -1,5 +1,5 @@
 ---
-timeout: 5s
+timeout: 10s
 instances:
 - name: 1
   address: 127.0.0.1:8001

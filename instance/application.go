@@ -25,14 +25,19 @@ retry:
 		// below we compute the backoff time before retrying
 		median := in.getMedianTimestamp()
 		proof, vrfOutput, _ := vrf.Prove(in.KeyStore.PublicKey[in.name], in.KeyStore.PrivateKey, Int64ToBytes(median))
+		verified, err := vrf.Verify(in.KeyStore.PublicKey[in.name], proof, Int64ToBytes(median))
+		if !verified {
+			fmt.Println("vrf wrong: ", err)
+		}
+		//fmt.Println("kproof", proof)
+		//fmt.Println("median", median)
+		//fmt.Println("all ts: ", in.timeStampSet[0], in.timeStampSet[1], in.timeStampSet[2])
 		KProof = proof
 		K = HashRatio(vrfOutput)
-		fmt.Println("K: ", K)
-		fmt.Println("retries: ", in.retries)
-		fmt.Println("RTT: ", in.roundTripTime.Microseconds())
-		backOffTime := int64(K*math.Pow(3, float64(in.retries))) * in.roundTripTime.Microseconds()
-		fmt.Println("backoff time: ", backOffTime)
+		//backOffTime := int64(K*math.Pow(3, float64(in.retries))) * in.roundTripTime.Microseconds()
+		backOffTime := K * math.Pow(2, float64(in.retries)) * float64(in.roundTripTime.Microseconds())
 		backoff := time.Duration(backOffTime) * time.Microsecond
+		fmt.Println("backOff time: ", backoff)
 		// backoff at here
 		time.Sleep(backoff)
 	}
@@ -46,14 +51,14 @@ retry:
 		goto retry
 	} else {
 		//the first accept phase : pre-accept phase
-		prePrepared := in.propose(retry, 1)
+		prePrepared := in.propose(1)
 		if !prePrepared { // if the phase 2 fail due to contention
 			fmt.Println("node: " + in.name + " retry phase 2")
 			retry = true
 			goto retry
 		} else {
 			//the second accept phase : accept phase
-			proposed := in.propose(retry, 2)
+			proposed := in.propose(2)
 			if !proposed { // if the phase 3 fail due to contention
 				fmt.Println("node: " + in.name + " retry phase 3")
 				retry = true

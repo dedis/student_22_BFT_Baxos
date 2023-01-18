@@ -2,7 +2,7 @@
 name: 3
 increment: 3
 f: 1
-timeout: 3s
+timeout: 10s
 listen: 127.0.0.1:8003
 peers:
   - name: 1

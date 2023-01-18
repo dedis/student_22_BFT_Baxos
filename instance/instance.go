@@ -101,7 +101,7 @@ func (in *Instance) AddPeer(name string, client consensus.BFTBaxosClient) error 
 		name:   name,
 		client: client,
 	})
-	fmt.Printf("added peer %v\n", name)
+	//fmt.Printf("added peer %v\n", name)
 
 	return nil
 }
